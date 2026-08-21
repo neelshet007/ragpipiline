@@ -9,6 +9,20 @@ import re
 from collections import Counter
 from typing import List, Dict, Any, Optional
 
+# Common Indic & English Stopwords to prevent spurious lexical matches
+STOPWORDS = {
+    # Hindi Stopwords
+    "क्या", "है", "हैं", "था", "थी", "थे", "का", "की", "के", "में", "से", "पर", "को", "और", "या",
+    "यह", "वह", "ये", "वे", "जो", "एक", "तो", "भी", "नहीं", "होता", "होती", "होते", "करने", "करता",
+    "करती", "करते", "किया", "गया", "गई", "गए", "लिए", "अपने", "अपनी", "अपना", "इस", "उस", "इन",
+    "उन", "कहा", "कहते", "सकता", "सकती", "सकते", "पास", "हुए", "हुआ", "हुई", "द्वारा", "तक",
+    # English Stopwords
+    "what", "is", "are", "was", "were", "the", "a", "an", "in", "on", "of", "to", "for",
+    "and", "or", "how", "why", "where", "when", "which", "who", "whom", "this", "that",
+    "these", "those", "it", "its", "do", "does", "did", "have", "has", "had", "be", "been"
+}
+
+
 class BM25Retriever:
     """
     Okapi BM25 Sparse Lexical Retriever.
@@ -26,7 +40,7 @@ class BM25Retriever:
         self.doc_freqs: Dict[str, int] = {}
         self.idf: Dict[str, float] = {}
 
-    def _tokenize(self, text: str) -> List[str]:
+    def _tokenize(self, text: str, filter_stopwords: bool = False) -> List[str]:
         """
         Tokenizes Devanagari and Latin text into lowercase word tokens,
         removing punctuation and isolated symbols.
@@ -35,6 +49,9 @@ class BM25Retriever:
             return []
         # Retain Devanagari script (\u0900-\u097F) and alphanumeric characters
         tokens = re.findall(r"[\u0900-\u097F\w]+", text.lower())
+        if filter_stopwords:
+            content_tokens = [t for t in tokens if t not in STOPWORDS]
+            return content_tokens if content_tokens else tokens
         return tokens
 
     def fit(self, chunks: List[Dict[str, Any]]):
@@ -78,7 +95,7 @@ class BM25Retriever:
         Executes Okapi BM25 search for a given query string.
         """
         t0 = time.perf_counter()
-        query_tokens = self._tokenize(query)
+        query_tokens = self._tokenize(query, filter_stopwords=True)
         if not query_tokens or self.doc_count == 0:
             return []
 

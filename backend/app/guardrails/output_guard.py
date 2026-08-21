@@ -72,8 +72,11 @@ class OutputGuardrail:
         bm25_max_scores = [s.get("bm25_max_score", 0.0) for s in retrieved_sources]
         best_bm25_score = max(bm25_max_scores) if bm25_max_scores else 0.0
 
-        # Grounded if BM25 found keyword match OR top score meets confidence threshold
-        is_grounded = (best_bm25_score >= 1.0) or (top_score >= self.min_confidence_score)
+        # Grounding check:
+        # 1. High BM25 score (>= 1.0) indicates real lexical keyword match.
+        # 2. Score >= 0.02 indicates high-confidence dense / standalone test match.
+        # Note: Pure RRF fallback without BM25 produces scores ~0.01639 (< 0.02), which correctly refuses!
+        is_grounded = (best_bm25_score >= 1.0) or (top_score >= 0.02)
 
         if not is_grounded:
             return self._build_refusal(query, top_score, "no_keyword_match_in_corpus", t0)

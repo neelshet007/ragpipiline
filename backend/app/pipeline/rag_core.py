@@ -43,8 +43,11 @@ def detect_query_language(text: str) -> str:
     return "hi"
 
 
-def translate_text(text: str, source_lang: str, target_lang: str) -> str:
-    """Translates text between languages safely with fallback."""
+from functools import lru_cache
+
+@lru_cache(maxsize=4096)
+def _cached_translate(text: str, source_lang: str, target_lang: str) -> str:
+    """Cached translation worker."""
     if not text or source_lang == target_lang:
         return text
     try:
@@ -52,6 +55,11 @@ def translate_text(text: str, source_lang: str, target_lang: str) -> str:
         return GoogleTranslator(source=source_lang, target=target_lang).translate(text)
     except Exception:
         return text
+
+
+def translate_text(text: str, source_lang: str, target_lang: str) -> str:
+    """Translates text between languages safely with high-speed LRU memory cache."""
+    return _cached_translate(text, source_lang, target_lang)
 
 
 class RAGCorePipeline:
