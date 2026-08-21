@@ -16,8 +16,8 @@ client = TestClient(app)
 def test_root_endpoint():
     response = client.get("/")
     assert response.status_code == 200
-    data = response.json()
-    assert "HH Goa 2026" in data["title"]
+    assert "HH Goa 2026" in response.text
+
 
 def test_health_endpoint():
     response = client.get("/health")

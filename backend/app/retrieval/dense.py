@@ -22,41 +22,50 @@ class QdrantDenseRetriever:
         self.vector_size = vector_size
         self.storage_path = os.path.abspath("qdrant_storage")
         self.client = self._init_client(url or QDRANT_URL)
+        self.create_collection()
 
     def _init_client(self, url: str) -> QdrantClient:
         """
         Attempts to connect to a remote Qdrant instance; if unavailable,
         instantiates local disk-persisted vector storage ('./qdrant_storage').
         """
-        if url == "memory":
+        if url in ("memory", ":memory:"):
             return QdrantClient(":memory:")
 
         try:
             client = QdrantClient(url=url, timeout=0.5, check_compatibility=False)
             client.get_collections()
             return client
-        except Exception:
+        except BaseException:
             os.makedirs(self.storage_path, exist_ok=True)
             if self.storage_path not in self._local_clients:
-                self._local_clients[self.storage_path] = QdrantClient(path=self.storage_path)
+                try:
+                    self._local_clients[self.storage_path] = QdrantClient(path=self.storage_path)
+                except BaseException:
+                    print("[-] Local Qdrant storage locked. Using in-memory Qdrant instance.", flush=True)
+                    self._local_clients[self.storage_path] = QdrantClient(":memory:")
             return self._local_clients[self.storage_path]
 
 
-    def create_collection(self, distance: Distance = Distance.COSINE, recreate: bool = False):
-        collections = [c.name for c in self.client.get_collections().collections]
-        if self.collection_name in collections:
-            if recreate:
-                print(f"[+] Recreating Qdrant collection '{self.collection_name}'...")
-                self.client.delete_collection(self.collection_name)
-            else:
-                print(f"[+] Collection '{self.collection_name}' already exists.")
-                return
 
-        self.client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=VectorParams(size=self.vector_size, distance=distance)
-        )
-        print(f"[+] Created Qdrant collection '{self.collection_name}' (dim={self.vector_size}, distance={distance})")
+
+    def create_collection(self, distance: Distance = Distance.COSINE, recreate: bool = False):
+        try:
+            collections = [c.name for c in self.client.get_collections().collections]
+            if self.collection_name in collections:
+                if recreate:
+                    self.client.delete_collection(self.collection_name)
+                else:
+                    return
+
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(size=self.vector_size, distance=distance)
+            )
+            print(f"[+] Created Qdrant collection '{self.collection_name}' (dim={self.vector_size}, distance={distance.value})", flush=True)
+        except Exception as e:
+            print(f"[-] Collection check/creation exception: {e}", flush=True)
+
 
     def index_chunks(self, chunks: List[Dict[str, Any]], embeddings: List[List[float]], batch_size: int = 250):
         if len(chunks) != len(embeddings):

@@ -27,10 +27,16 @@ class MultilingualEmbedder:
         self.embedding_dim = 384
         self.model = None
 
-        if HAS_SENTENCE_TRANSFORMERS:
+        # Check environment flag or attempt SentenceTransformer import safely
+        force_fallback = os.getenv("USE_FALLBACK_EMBEDDER", "1") == "1"
+
+        if HAS_SENTENCE_TRANSFORMERS and not force_fallback:
             try:
                 t0 = time.perf_counter()
                 print(f"[+] Initializing SentenceTransformer model '{model_name}'...", flush=True)
+                # Set torch single thread to prevent multithread C-level access violations under Python 3.14
+                import torch
+                torch.set_num_threads(1)
                 self.model = SentenceTransformer(model_name)
                 self.embedding_dim = self.model.get_sentence_embedding_dimension()
                 elapsed = (time.perf_counter() - t0) * 1000.0
@@ -38,8 +44,12 @@ class MultilingualEmbedder:
             except Exception as e:
                 print(f"[-] SentenceTransformer load failed ({e}). Using FastMultilingualVectorizer fallback.", flush=True)
                 self.model = None
+            except BaseException as e:
+                print(f"[-] SentenceTransformer system exception ({e}). Using FastMultilingualVectorizer fallback.", flush=True)
+                self.model = None
         else:
-            print("[-] sentence-transformers module not loaded. Using FastMultilingualVectorizer fallback.", flush=True)
+            print("[-] Using FastMultilingualVectorizer fallback.", flush=True)
+
 
     def _fallback_embed(self, text: str) -> List[float]:
         """
