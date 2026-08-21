@@ -3,7 +3,6 @@ let currentMode = 'voice';
 let isRecording = false;
 let recognition = null;
 let websocket = null;
-let audioContext = null;
 
 // Initialize on DOM load
 document.addEventListener("DOMContentLoaded", () => {
@@ -48,7 +47,7 @@ function initWebSpeech() {
     recognition.onstart = () => {
       isRecording = true;
       document.getElementById('mic-btn').classList.add('recording');
-      document.getElementById('voice-status-text').textContent = 'Listening... Speak clearly now';
+      document.getElementById('voice-status-text').textContent = '🎙️ Listening... Speak now in Hindi or English!';
     };
 
     recognition.onresult = (event) => {
@@ -65,34 +64,65 @@ function initWebSpeech() {
     };
 
     recognition.onerror = (event) => {
+      console.error('Speech recognition error:', event.error);
       stopRecording();
-      document.getElementById('voice-status-text').textContent = `Speech error: ${event.error}. Try text mode.`;
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        document.getElementById('voice-status-text').textContent = '❌ Microphone permission denied. Please allow mic access in your browser location bar.';
+      } else {
+        document.getElementById('voice-status-text').textContent = `Speech error: ${event.error}. Try clicking mic again or use Text Mode.`;
+      }
     };
 
     recognition.onend = () => {
       stopRecording();
     };
   } else {
-    document.getElementById('voice-status-text').textContent = 'Web Speech API not supported in browser. Use Text Mode.';
+    document.getElementById('voice-status-text').textContent = '⚠️ Web Speech API is not supported in this browser. Please use Chrome / Edge or switch to Text Mode.';
   }
 }
 
-function toggleRecording() {
-  if (!recognition) {
-    alert('Web Speech API is not supported in your browser. Please switch to Text Mode.');
+// Toggle Mic Recording with Explicit Permission Request
+async function toggleRecording() {
+  if (isRecording) {
+    stopRecording();
     return;
   }
-  if (isRecording) {
-    recognition.stop();
+
+  // Request explicit mic permission first to trigger browser prompt
+  if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Stop temporary track right after permission prompt succeeds
+      stream.getTracks().forEach(track => track.stop());
+    } catch (err) {
+      console.error('Microphone access denied:', err);
+      document.getElementById('voice-status-text').textContent = '❌ Microphone permission denied. Click the lock/tune icon in the browser address bar to allow mic access.';
+      alert('Microphone permission is required for Voice Mode. Please allow mic access in your browser address bar.');
+      return;
+    }
+  }
+
+  if (recognition) {
+    try {
+      recognition.start();
+    } catch (e) {
+      console.error('Failed to start speech recognition:', e);
+      stopRecording();
+    }
   } else {
-    recognition.start();
+    alert('Web Speech API is not supported in your browser. Please switch to Text Mode.');
   }
 }
 
 function stopRecording() {
   isRecording = false;
   document.getElementById('mic-btn').classList.remove('recording');
-  document.getElementById('voice-status-text').textContent = 'Click mic button to start voice input';
+  document.getElementById('voice-status-text').textContent = 'Click the microphone button to start voice input';
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch (e) {}
+  }
 }
 
 // Canvas Waveform Animation
@@ -106,11 +136,11 @@ function initCanvasWaveform() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.beginPath();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = '#00f2fe';
+    ctx.strokeStyle = isRecording ? '#00e676' : '#00f2fe';
 
     const height = canvas.height;
     const width = canvas.width;
-    const amplitude = isRecording ? 25 : 5;
+    const amplitude = isRecording ? 30 : 5;
 
     for (let x = 0; x < width; x++) {
       const y = height / 2 + Math.sin((x + step) * 0.05) * amplitude * Math.sin(x * 0.01);
@@ -160,7 +190,8 @@ function initWebSocket() {
 
 // Dispatch Query Payload via REST or WebSocket
 async function sendQueryPayload(queryText, mode) {
-  const protocol = document.getElementById('protocol').value;
+  const protocolSelect = document.getElementById('protocol');
+  const protocol = protocolSelect ? protocolSelect.value : 'rest';
   document.getElementById('display-answer').textContent = 'Synthesizing response...';
 
   if (protocol === 'ws' && websocket && websocket.readyState === WebSocket.OPEN) {
@@ -173,8 +204,8 @@ async function sendQueryPayload(queryText, mode) {
     return;
   }
 
-  // REST API Fallback
-  try:
+  // REST API Execution
+  try {
     const endpoint = mode === 'voice' ? '/api/v1/voice' : '/api/v1/query';
     const body = mode === 'voice' 
       ? { text_transcript: queryText, language: 'hi', top_k: 3 }
@@ -232,7 +263,7 @@ function renderRAGResponse(data) {
     const format = data.audio_format || 'mp3';
     audioPlayer.src = `data:audio/${format};base64,${data.audio_base64}`;
     audioContainer.classList.remove('hidden');
-    audioPlayer.play().catch(e => console.log('Audio autoplay prevented'));
+    audioPlayer.play().catch(e => console.log('Audio autoplay prevented by browser'));
   }
 
   // Render Source Document Passages
