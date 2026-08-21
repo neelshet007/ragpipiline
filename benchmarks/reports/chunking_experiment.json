@@ -1,0 +1,50 @@
+{
+  "sentence": {
+    "strategy": "sentence",
+    "total_documents": 2001,
+    "total_chunks": 2003,
+    "avg_tokens_per_chunk": 61.66,
+    "min_tokens_per_chunk": 6,
+    "max_tokens_per_chunk": 1421,
+    "processing_latency_ms": 30.44,
+    "latency_per_doc_ms": 0.015,
+    "estimated_file_size_mb": 1.98,
+    "output_file": "data\\chunks_sentence.jsonl"
+  },
+  "sliding_window": {
+    "strategy": "sliding_window",
+    "total_documents": 2001,
+    "total_chunks": 2022,
+    "avg_tokens_per_chunk": 61.45,
+    "min_tokens_per_chunk": 6,
+    "max_tokens_per_chunk": 150,
+    "processing_latency_ms": 13.36,
+    "latency_per_doc_ms": 0.007,
+    "estimated_file_size_mb": 2.0,
+    "output_file": "data\\chunks_sliding_window.jsonl"
+  },
+  "semantic": {
+    "strategy": "semantic",
+    "total_documents": 2001,
+    "total_chunks": 3915,
+    "avg_tokens_per_chunk": 31.55,
+    "min_tokens_per_chunk": 1,
+    "max_tokens_per_chunk": 1421,
+    "processing_latency_ms": 176.52,
+    "latency_per_doc_ms": 0.088,
+    "estimated_file_size_mb": 2.44,
+    "output_file": "data\\chunks_semantic.jsonl"
+  },
+  "metadata_aware": {
+    "strategy": "metadata_aware",
+    "total_documents": 2001,
+    "total_chunks": 2003,
+    "avg_tokens_per_chunk": 61.66,
+    "min_tokens_per_chunk": 6,
+    "max_tokens_per_chunk": 1421,
+    "processing_latency_ms": 34.56,
+    "latency_per_doc_ms": 0.017,
+    "estimated_file_size_mb": 3.04,
+    "output_file": "data\\chunks_metadata_aware.jsonl"
+  }
+}

@@ -1,0 +1,32 @@
+# Environment
+.venv/
+venv/
+ENV/
+env/
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / Next.js
+frontend/.next/
+frontend/node_modules/
+node_modules/
+
+# Data & Indexes
+data/
+qdrant_storage/
+benchmarks/results/*.json
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
