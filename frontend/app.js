@@ -230,10 +230,36 @@ async function sendQueryPayload(queryText, mode) {
 
 // Render RAG Core Response & Metrics
 function renderRAGResponse(data) {
-  // Render Answer & Query
-  document.getElementById('display-answer').textContent = data.answer;
+  // Determine if the guardrail refused this answer
+  const guardrail = data.guardrail || {};
+  const isRefused = guardrail.refused === true;
+  const isGrounded = !isRefused;
+
+  // Render Answer with visual style based on grounding
+  const answerEl = document.getElementById('display-answer');
+  answerEl.textContent = data.answer;
+  answerEl.style.borderLeft = isRefused
+    ? '4px solid #ff5252'
+    : '4px solid #00e676';
+  answerEl.style.background = isRefused
+    ? 'rgba(255,82,82,0.07)'
+    : 'rgba(0,230,118,0.05)';
+
   if (data.query) {
     document.getElementById('display-query').textContent = `"${data.query}"`;
+  }
+
+  // Display Detected Language Badge
+  const langBadge = document.getElementById('badge-lang');
+  if (langBadge && data.detected_language) {
+    const langNames = {
+      'en': 'English', 'hi': 'Hindi (हिन्दी)', 'gu': 'Gujarati (ગુજરાતી)',
+      'bn': 'Bengali (বাংলা)', 'ta': 'Tamil (தமிழ்)', 'te': 'Telugu (తెలుగు)',
+      'mr': 'Marathi (मराठी)', 'pa': 'Punjabi (ਪੰਜਾਬੀ)', 'kn': 'Kannada (ಕನ್ನಡ)', 'ml': 'Malayalam (മലയാളം)'
+    };
+    const name = langNames[data.detected_language] || data.detected_language.toUpperCase();
+    langBadge.textContent = `🌐 ${name}`;
+    langBadge.style.display = 'inline-block';
   }
 
   // Update Latency Metrics Dashboard
@@ -273,15 +299,21 @@ function renderRAGResponse(data) {
   const sources = data.sources || [];
   document.getElementById('sources-count').textContent = `${sources.length} Passages`;
 
-  if (sources.length === 0) {
-    sourcesContainer.innerHTML = '<div class="empty-state">No context passages retrieved for this query.</div>';
+  if (isRefused || sources.length === 0) {
+    const reason = guardrail.reason || 'no_match';
+    sourcesContainer.innerHTML = `
+      <div class="empty-state" style="color:#ff5252;">
+        ⚠️ Guardrail triggered: <strong>${reason}</strong><br>
+        No relevant passages were found in the indexed corpus for this query.<br>
+        <span style="opacity:0.6;font-size:0.85em;">Tip: Try Hindi queries like 'ताज महल कहाँ है?' or 'कॉर्पोरेशन क्या है?'</span>
+      </div>`;
     return;
   }
 
   sources.forEach((src) => {
     const itemDiv = document.createElement('div');
     itemDiv.className = 'source-item';
-    const scoreVal = src.score ? src.score.toFixed(4) : 'N/A';
+    const scoreVal = src.score ? src.score.toFixed(6) : 'N/A';
 
     itemDiv.innerHTML = `
       <div class="source-meta">

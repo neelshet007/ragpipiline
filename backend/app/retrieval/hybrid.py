@@ -24,30 +24,39 @@ class HybridRetriever:
         dense_results: List[Dict[str, Any]],
         sparse_results: List[Dict[str, Any]],
         k: int = 60,
-        top_k: int = 5
+        top_k: int = 5,
+        sparse_weight: float = 1.5
     ) -> List[Dict[str, Any]]:
         """
         Calculates Reciprocal Rank Fusion (RRF) score:
-        RRF(d) = sum( 1.0 / (k + rank(d)) ) for each retriever list.
+        RRF(d) = sum( weight / (k + rank(d)) ) for each retriever list.
+        Sparse BM25 is weighted higher (1.5x) to ensure exact keyword matches
+        take precedence over noisy fallback vector approximations.
         """
         rrf_scores: Dict[str, float] = {}
         item_payloads: Dict[str, Dict[str, Any]] = {}
+        bm25_ranks: Dict[str, int] = {}
+
+        # Process Sparse Ranks first (primary keyword relevance)
+        for rank, item in enumerate(sparse_results, start=1):
+            chunk_id = item.get("chunk_id") or item.get("document_id") or str(item.get("chunk_text"))
+            item_payloads[chunk_id] = item
+            bm25_ranks[chunk_id] = rank
+            rrf_scores[chunk_id] = rrf_scores.get(chunk_id, 0.0) + (sparse_weight / (k + rank))
 
         # Process Dense Ranks
         for rank, item in enumerate(dense_results, start=1):
-            chunk_id = item.get("chunk_id") or item.get("document_id") or str(item.get("chunk_text"))
-            item_payloads[chunk_id] = item
-            rrf_scores[chunk_id] = rrf_scores.get(chunk_id, 0.0) + (1.0 / (k + rank))
-
-        # Process Sparse Ranks
-        for rank, item in enumerate(sparse_results, start=1):
             chunk_id = item.get("chunk_id") or item.get("document_id") or str(item.get("chunk_text"))
             if chunk_id not in item_payloads:
                 item_payloads[chunk_id] = item
             rrf_scores[chunk_id] = rrf_scores.get(chunk_id, 0.0) + (1.0 / (k + rank))
 
-        # Sort by RRF score descending
-        sorted_ids = sorted(rrf_scores.keys(), key=lambda cid: rrf_scores[cid], reverse=True)[:top_k]
+        # Sort by RRF score descending, breaking ties with BM25 rank
+        sorted_ids = sorted(
+            rrf_scores.keys(),
+            key=lambda cid: (rrf_scores[cid], -bm25_ranks.get(cid, 999)),
+            reverse=True
+        )[:top_k]
 
         fused_results = []
         for rank, cid in enumerate(sorted_ids, start=1):
@@ -119,6 +128,7 @@ class HybridRetriever:
     ) -> List[Dict[str, Any]]:
         """
         Executes hybrid retrieval using both dense vector and sparse lexical search.
+        Attaches retrieval diagnostics: bm25_hit (True if BM25 found keyword matches).
         """
         t0 = time.perf_counter()
 
@@ -136,6 +146,10 @@ class HybridRetriever:
             lang_filter=lang_filter
         )
 
+        # Diagnostic: did BM25 find any keyword match?
+        bm25_hit = len(sparse_results) > 0
+        bm25_max_score = max((r.get("score", 0.0) for r in sparse_results), default=0.0)
+
         # Fusion Algorithm
         if mode == "convex":
             fused = self.convex_score_fusion(dense_results, sparse_results, alpha=alpha, top_k=top_k)
@@ -145,5 +159,7 @@ class HybridRetriever:
         latency_ms = round((time.perf_counter() - t0) * 1000.0, 3)
         for item in fused:
             item["total_hybrid_latency_ms"] = latency_ms
+            item["bm25_hit"] = bm25_hit
+            item["bm25_max_score"] = round(bm25_max_score, 4)
 
         return fused
