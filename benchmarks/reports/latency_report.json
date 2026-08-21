@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-08-21 20:38:45",
+  "sample_size": 100,
+  "target_latency_ms": 200.0,
+  "metrics": {
+    "p50_latency_ms": 7.71,
+    "p70_latency_ms": 8.828,
+    "p90_latency_ms": 11.22,
+    "p100_max_latency_ms": 13.11,
+    "mean_latency_ms": 8.004,
+    "min_latency_ms": 4.703,
+    "std_dev_ms": 1.887
+  },
+  "breakdown_averages_ms": {
+    "embedding_ms": 0.106,
+    "retrieval_ms": 7.885,
+    "context_build_ms": 0.009,
+    "generation_ms": 0.0
+  },
+  "sub_200ms_compliance": {
+    "met_target_count": 100,
+    "compliance_percentage": 100.0
+  },
+  "total_benchmark_duration_sec": 0.8
+}
