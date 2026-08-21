@@ -35,16 +35,22 @@ app.add_middleware(
 app.include_router(api_router)
 app.include_router(ws_router)
 
-@app.get("/")
-def root():
-    return {
-        "title": "HH Goa 2026 — Voice-Enabled RAG System",
-        "docs": "/docs",
-        "health": "/health",
-        "api_v1_query": "/api/v1/query",
-        "api_v1_voice": "/api/v1/voice",
-        "websocket": "/ws/rag"
-    }
+# Mount Frontend Static Web Interface
+frontend_path = os.path.abspath("frontend")
+if os.path.exists(frontend_path):
+    app.mount("/", StaticFiles(directory=frontend_path, html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        return {
+            "title": "HH Goa 2026 — Voice-Enabled RAG System",
+            "docs": "/docs",
+            "health": "/health",
+            "api_v1_query": "/api/v1/query",
+            "api_v1_voice": "/api/v1/voice",
+            "websocket": "/ws/rag"
+        }
+
 
 if __name__ == "__main__":
     import uvicorn

@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HH Goa 2026 — Voice-Enabled RAG System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="index.css" />
+</head>
+<body>
+  <div class="glow-bg"></div>
+
+  <!-- Main Container -->
+  <div class="app-container">
+    <!-- Header -->
+    <header class="navbar">
+      <div class="brand">
+        <div class="logo-icon">⚡</div>
+        <div class="brand-text">
+          <h1>HH Goa 2026</h1>
+          <span class="subtitle">Voice-Enabled Multilingual RAG Engine</span>
+        </div>
+      </div>
+      <div class="header-badges">
+        <span class="badge badge-success" id="badge-status">● System Online</span>
+        <span class="badge badge-primary">Qdrant Vector DB</span>
+        <span class="badge badge-accent">Sub-200ms Target</span>
+      </div>
+    </header>
+
+    <!-- Hero Controls Section -->
+    <main class="main-content">
+      <div class="hero-card glass">
+        <div class="mode-toggles">
+          <button class="toggle-btn active" id="btn-mode-voice" onclick="switchMode('voice')">🎙️ Voice Mode</button>
+          <button class="toggle-btn" id="btn-mode-text" onclick="switchMode('text')">💬 Text Mode</button>
+          <div class="protocol-select">
+            <label for="protocol">Protocol:</label>
+            <select id="protocol" class="select-input">
+              <option value="rest">REST API (HTTP)</option>
+              <option value="ws">WebSocket (Live Stream)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Voice Interaction Section -->
+        <div id="section-voice" class="interaction-section">
+          <div class="visualizer-container">
+            <canvas id="waveform-canvas" width="400" height="100"></canvas>
+            <button class="mic-button" id="mic-btn" onclick="toggleRecording()">
+              <div class="mic-pulse"></div>
+              <span class="mic-icon" id="mic-icon">🎙️</span>
+            </button>
+          </div>
+          <p class="voice-instruction" id="voice-status-text">Click the microphone button and speak in Hindi or English</p>
+        </div>
+
+        <!-- Text Input Section -->
+        <div id="section-text" class="interaction-section hidden">
+          <div class="input-group">
+            <input type="text" id="text-query-input" placeholder="उदाहरण: कॉर्पोरेशन क्या है? या भारत की राजधानी क्या है?" onkeydown="if(event.key==='Enter') submitTextQuery()" />
+            <button class="send-btn" onclick="submitTextQuery()">Search RAG ➔</button>
+          </div>
+        </div>
+
+        <!-- Latency Metrics Bar -->
+        <div class="latency-bar">
+          <div class="metric-item">
+            <span class="metric-label">STT Audio</span>
+            <span class="metric-value" id="val-stt">0.0 ms</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Embedding</span>
+            <span class="metric-value" id="val-embed">0.0 ms</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">Qdrant + BM25</span>
+            <span class="metric-value" id="val-retrieval">0.0 ms</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">TTS Audio</span>
+            <span class="metric-value" id="val-tts">0.0 ms</span>
+          </div>
+          <div class="metric-item total-item">
+            <span class="metric-label">Total RAG Core</span>
+            <span class="metric-value highlight" id="val-total">0.0 ms</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results Grid -->
+      <div class="results-grid">
+        <!-- Answer Card -->
+        <div class="glass-card answer-card">
+          <div class="card-header">
+            <h3>🤖 RAG Synthesized Answer</h3>
+            <span class="badge" id="badge-compliance">Sub-200ms Target: --</span>
+          </div>
+          <div class="card-body">
+            <p class="query-display" id="display-query"><em>Waiting for voice or text query...</em></p>
+            <div class="answer-box" id="display-answer">
+              Your synthesized multilingual answer grounded in MSMARCO-XI passage context will appear here.
+            </div>
+
+            <!-- Audio Player -->
+            <div class="audio-player-container hidden" id="audio-container">
+              <audio id="tts-audio-player" controls autoplay></audio>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sources Inspector Accordion -->
+        <div class="glass-card sources-card">
+          <div class="card-header">
+            <h3>📚 Retrieved Document Passages (RRF Fusion)</h3>
+            <span class="badge badge-accent" id="sources-count">0 Passages</span>
+          </div>
+          <div class="card-body" id="display-sources">
+            <div class="empty-state">No document sources retrieved yet. Submit a query to inspect ranked passages.</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>HH Goa 2026 Shortlisting Task 2 — Voice-Enabled Multilingual RAG System | <a href="/docs" target="_blank">API Docs (/docs)</a></p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
