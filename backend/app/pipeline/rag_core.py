@@ -14,12 +14,12 @@ from backend.app.embeddings.embedder import MultilingualEmbedder
 from backend.app.retrieval.dense import QdrantDenseRetriever
 from backend.app.retrieval.bm25 import BM25Retriever
 from backend.app.retrieval.hybrid import HybridRetriever
+from backend.app.guardrails.input_guard import InputGuardrail
+from backend.app.guardrails.output_guard import OutputGuardrail
 
 class RAGCorePipeline:
     """
-    End-to-End Low-Latency RAG Core Engine.
-    Exposes query processing, hybrid retrieval, prompt context construction,
-    and fast response synthesis with microsecond precision timing.
+    End-to-End Low-Latency RAG Core Engine with Security Guardrails & Refusal Architecture.
     """
 
     def __init__(
@@ -30,7 +30,7 @@ class RAGCorePipeline:
         bm25_index_path: str = "data/bm25_index.json"
     ):
         t0 = time.perf_counter()
-        print("[+] Initializing RAGCorePipeline...", flush=True)
+        print("[+] Initializing RAGCorePipeline with Guardrails...", flush=True)
 
         self.embedder = embedder or MultilingualEmbedder()
         self.dense_retriever = dense_retriever or QdrantDenseRetriever()
@@ -40,17 +40,16 @@ class RAGCorePipeline:
         else:
             self.bm25_retriever = BM25Retriever()
             if os.path.exists(bm25_index_path):
-                print(f"[+] Loading BM25 index from '{bm25_index_path}'...", flush=True)
                 with open(bm25_index_path, "r", encoding="utf-8") as f:
                     idx_data = json.load(f)
                     self.bm25_retriever.fit(idx_data.get("chunks", []))
-            else:
-                print(f"[-] BM25 index path '{bm25_index_path}' not found. BM25 search will use fallback.", flush=True)
 
         self.hybrid_retriever = HybridRetriever(
             dense_retriever=self.dense_retriever,
             bm25_retriever=self.bm25_retriever
         )
+        self.input_guard = InputGuardrail()
+        self.output_guard = OutputGuardrail()
 
         init_ms = (time.perf_counter() - t0) * 1000.0
         print(f"[+] RAGCorePipeline initialized in {init_ms:.2f} ms!", flush=True)
@@ -63,14 +62,34 @@ class RAGCorePipeline:
         alpha: float = 0.5,
         lang_filter: Optional[str] = None
     ) -> Dict[str, Any]:
-        """
-        Executes end-to-end RAG query pipeline:
-        1. Query Vectorization
-        2. Hybrid Dense + BM25 Search (RRF)
-        3. Context Payload Assembly
-        4. Answer Synthesis & Latency Audit
-        """
         t_start = time.perf_counter()
+
+        # Input Guardrail Check
+        input_check = self.input_guard.validate_query(query)
+        if not input_check["is_safe"]:
+            total_pipeline_ms = round((time.perf_counter() - t_start) * 1000.0, 3)
+            return {
+                "query": query,
+                "answer": input_check["refusal_message"],
+                "context": "",
+                "sources": [],
+                "retrieved_chunks_count": 0,
+                "guardrail": {
+                    "input_check": input_check,
+                    "output_check": None,
+                    "refused": True,
+                    "reason": input_check["reason"]
+                },
+                "latency": {
+                    "embed_ms": 0.0,
+                    "retrieval_ms": 0.0,
+                    "context_build_ms": 0.0,
+                    "generation_ms": 0.0,
+                    "guardrail_ms": input_check["check_latency_ms"],
+                    "total_pipeline_ms": total_pipeline_ms
+                },
+                "sub_200ms_target_met": total_pipeline_ms < 200.0
+            }
 
         # Step 1: Query Embedding
         t_emb_0 = time.perf_counter()
@@ -108,29 +127,40 @@ class RAGCorePipeline:
         formatted_context = "\n\n".join(context_passages)
         context_build_ms = round((time.perf_counter() - t_ctx_0) * 1000.0, 3)
 
-        # Step 4: Fast Extractive / Generative Answer Synthesis
+        # Step 4: Answer Synthesis
         t_gen_0 = time.perf_counter()
-        if retrieved_chunks:
-            primary_chunk = retrieved_chunks[0]
-            answer = primary_chunk.get("chunk_text", "संदर्भ उपलब्ध नहीं है।")
-        else:
-            answer = "मुझे इस प्रश्न का उत्तर देने के लिए पर्याप्त जानकारी नहीं मिली।"
-
+        raw_answer = retrieved_chunks[0].get("chunk_text", "") if retrieved_chunks else ""
         generation_ms = round((time.perf_counter() - t_gen_0) * 1000.0, 3)
+
+        # Step 5: Output Guardrail Check
+        output_check = self.output_guard.validate_output(
+            query=query,
+            retrieved_sources=doc_sources,
+            generated_answer=raw_answer
+        )
+
         total_pipeline_latency_ms = round((time.perf_counter() - t_start) * 1000.0, 3)
 
         return {
             "query": query,
-            "answer": answer,
+            "answer": output_check["final_answer"],
             "context": formatted_context,
-            "sources": doc_sources,
+            "sources": doc_sources if output_check["is_grounded"] else [],
             "retrieved_chunks_count": len(retrieved_chunks),
+            "guardrail": {
+                "input_check": input_check,
+                "output_check": output_check,
+                "refused": not output_check["is_grounded"],
+                "reason": output_check["reason"]
+            },
             "latency": {
                 "embed_ms": embed_latency_ms,
                 "retrieval_ms": search_latency_ms,
                 "context_build_ms": context_build_ms,
                 "generation_ms": generation_ms,
+                "guardrail_ms": input_check["check_latency_ms"] + output_check["guard_latency_ms"],
                 "total_pipeline_ms": total_pipeline_latency_ms
             },
             "sub_200ms_target_met": total_pipeline_latency_ms < 200.0
         }
+

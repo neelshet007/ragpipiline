@@ -15,6 +15,8 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "")
 DEFAULT_COLLECTION = "msmarco_xi_hi"
 
 class QdrantDenseRetriever:
+    _local_clients: Dict[str, QdrantClient] = {}
+
     def __init__(self, collection_name: str = DEFAULT_COLLECTION, vector_size: int = 384, url: Optional[str] = None):
         self.collection_name = collection_name
         self.vector_size = vector_size
@@ -27,19 +29,18 @@ class QdrantDenseRetriever:
         instantiates local disk-persisted vector storage ('./qdrant_storage').
         """
         if url == "memory":
-            print("[+] Initializing in-memory Qdrant instance...", flush=True)
             return QdrantClient(":memory:")
 
         try:
-            print(f"[+] Connecting to Qdrant cluster at {url}...", flush=True)
             client = QdrantClient(url=url, timeout=0.5, check_compatibility=False)
             client.get_collections()
-            print(f"[+] Connected to remote Qdrant server at {url}!", flush=True)
             return client
-        except Exception as e:
-            print(f"[-] Remote Qdrant server unreachable ({e}). Using local disk storage './qdrant_storage'.", flush=True)
+        except Exception:
             os.makedirs(self.storage_path, exist_ok=True)
-            return QdrantClient(path=self.storage_path)
+            if self.storage_path not in self._local_clients:
+                self._local_clients[self.storage_path] = QdrantClient(path=self.storage_path)
+            return self._local_clients[self.storage_path]
+
 
     def create_collection(self, distance: Distance = Distance.COSINE, recreate: bool = False):
         collections = [c.name for c in self.client.get_collections().collections]

@@ -51,7 +51,7 @@ def test_qdrant_retriever_local_index_and_search():
 
     retriever.index_chunks(dummy_chunks, vecs)
 
-    q_vec = embedder.embed_query("निगम या कंपनी क्या होती है?")
+    q_vec = embedder.embed_query("कॉर्पोरेशन क्या होती है?")
     hits = retriever.search(q_vec, top_k=2)
 
     assert len(hits) >= 1
